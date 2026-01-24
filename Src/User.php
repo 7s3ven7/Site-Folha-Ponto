@@ -24,14 +24,18 @@ class User
         return $this->db->select('SELECT * FROM users WHERE `id` = :id', [':id' => $id]);
     }
 
-    public function saveUser(?string $name = null, ?string $password = null): string
+    public function saveUser(?string $name = null, ?string $password = null): array|bool
     {
-        return match (null) {
-            $name || $password => json_encode(['error' => 'Not Found Data']),
-            default => $this->db->query(
-                "INSERT INTO users (`name`, `password`) VALUES (:name, :password)",
-                [':name' => $name, ':password' => $password]),
-        };
+
+        if (count($this->db->select('SELECT * FROM users WHERE `name` = :name AND `password` = :password', [':name' => $name, ':password' => $password])) > 0) {
+            return false;
+        }
+
+        $this->db->query(
+            "INSERT INTO users (`name`, `password`) VALUES (:name, :password)",
+            [':name' => $name, ':password' => $password]);
+
+        return $this->db->select('SELECT * FROM users WHERE `name` = :name AND `password` = :password', [':name' => $name, ':password' => $password]);
     }
 
     public function modifyUser(?int $id = null, ?string $name = null, ?string $password = null): string
