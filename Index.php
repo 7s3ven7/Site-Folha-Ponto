@@ -1,6 +1,6 @@
 <?php
 
-use Project\Src\User;
+use Src\User;
 
 require_once 'Src/User.php';
 

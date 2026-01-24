@@ -1,6 +1,6 @@
 <?php
 
-namespace Project\Src;
+namespace Src;
 
 require 'DB.php';
 
