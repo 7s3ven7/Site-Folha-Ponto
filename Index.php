@@ -13,7 +13,12 @@ $body = file_get_contents('php://input');
 
 switch ($server->getMethod()) {
     case 'GET':
+
         $object = $dataManipulator->createObject($body);
+
+        if (is_array($object)) {
+            $server->response($object[0], $object[1]);
+        }
 
         $server->response(201, $object);
 

@@ -38,36 +38,22 @@ class DataManipulator
             $this->response = ['error' => ['message' => 'Data missing', 'Data' => $lastKey]];
         }
 
-        if (is_array($data) && (count($data) > 0)) {
-
-
-            //valida se valor de váriavel do array fields é array
-            //pula se sim, senão continua
-            $typeArray = false;
+        if (is_array($data) && (count($data) > 0) && $lastKey != 'value') {
 
             foreach ($data as $key => $value) {
-
-                if ($key === 'value' && is_array($value)) {
-                    $typeArray = true;
-                    continue;
-                }
 
                 $newPatch = $patch;
                 $newPatch[] = $key;
                 $this->validate($value, $key, $newPatch);
             }
 
-            if (!$typeArray) {
-                return;
-            }
-
         }
+
 
         if ($lastKey === 'type') {
             $this->variablesTypes[$patch[count($patch) - 2]][$lastKey] = $data;
             return;
         }
-
         if ($lastKey === 'value') {
 
             if ($data === "") {
@@ -124,7 +110,6 @@ class DataManipulator
 
                     return;
                 case 'array':
-
                     if (!is_array($data)) {
                         $this->response = ['error' => ['message' => 'Data must be an array']];
                         return;
@@ -135,12 +120,11 @@ class DataManipulator
                     return;
                 case 'object':
 
-                    if (!is_object($data)) {
-                        $this->response = ['error' => ['message' => 'Data must be an object']];
-                        return;
-                    }
+                    $dataManipulator = new DataManipulator();
 
-                    $this->variablesTypes[$patch[count($patch) - 2]][$lastKey] = $data;
+                    $object = $dataManipulator->createObject(json_encode($data));
+
+                    $this->variablesTypes[$patch[count($patch) - 2]][$lastKey] = $object;
 
                     return;
             }
