@@ -17,7 +17,8 @@ switch ($server->getMethod()) {
         $object = $dataManipulator->createObject($body);
 
         if (is_array($object)) {
-            $server->response($object[0], $object[1]);
+            $server->response(400, $object);
+            break;
         }
 
         $server->response(201, $object);

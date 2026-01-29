@@ -2,14 +2,26 @@
 
 namespace Src;
 
+use Exception;
 use stdClass;
 
 class DataManipulator
 {
 
-    private array $response;
+    private array $response = [];
 
     private array $variablesTypes;
+
+    public function getResponse(): array|null
+    {
+
+        if (count($this->response) > 0) {
+
+            return $this->response;
+        }
+
+        return null;
+    }
 
     private function filter(string $data): array|null
     {
@@ -34,10 +46,6 @@ class DataManipulator
     private function validate(mixed $data, string $lastKey, array $patch): void
     {
 
-        if (!isset($data)) {
-            $this->response = ['error' => ['message' => 'Data missing', 'Data' => $lastKey]];
-        }
-
         if (is_array($data) && (count($data) > 0) && $lastKey != 'value') {
 
             foreach ($data as $key => $value) {
@@ -45,10 +53,10 @@ class DataManipulator
                 $newPatch = $patch;
                 $newPatch[] = $key;
                 $this->validate($value, $key, $newPatch);
+
             }
 
         }
-
 
         if ($lastKey === 'type') {
             $this->variablesTypes[$patch[count($patch) - 2]][$lastKey] = $data;
@@ -65,12 +73,32 @@ class DataManipulator
                 case 'int':
 
                     if (!is_numeric($data)) {
-                        $this->response = ['error' => ['message' => 'Data must be a int']];
+                        $this->response = ['error' => ['message' => 'Data must be a int', 'Key' => $lastKey, 'Data' => $data, 'Patch' => $patch]];
                         return;
                     }
 
-                    if (!ctype_digit($data)) {
-                        $this->response = ['error' => ['message' => 'Data must be a int not float']];
+                    try {
+                        for ($i = 0; $i < strlen($data);) {
+                            if ($data[$i] === '0') {
+                                $data = substr_replace($data, '', $i, 1);
+                            } else {
+                                $i++;
+                            }
+                        }
+
+                        if ($data != floor($data)){
+                            $this->response = ['error' => ['message' => 'Data must be a int not float', 'Key' => $lastKey, 'Data' => $data, 'Patch' => $patch]];
+                        }
+
+                            $data = (int)$data;
+
+                    } catch (Exception) {
+                        $this->response = ['error' => ['message' => 'Data must be a int', 'Key' => $lastKey, 'Data' => $data, 'Patch' => $patch]];
+                    }
+
+
+                    if (($data >= 0) && (!ctype_digit((string)$data))) {
+                        $this->response = ['error' => ['message' => 'Data must be a int not float', 'Key' => $lastKey, 'Data' => $data, 'Patch' => $patch]];
                         return;
                     }
 
@@ -79,8 +107,10 @@ class DataManipulator
                     return;
                 case 'float':
 
+                    $data = str_replace(',', '.', $data);
+
                     if (!is_numeric($data)) {
-                        $this->response = ['error' => ['message' => 'Data must be a float']];
+                        $this->response = ['error' => ['message' => 'Data must be a float', 'Key' => $lastKey, 'Data' => $data, 'Patch' => $patch]];
                         return;
                     }
 
@@ -92,26 +122,41 @@ class DataManipulator
                     $bool = filter_var($data, FILTER_VALIDATE_BOOLEAN);
 
                     if (!is_bool($bool)) {
-                        $this->response = ['error' => ['message' => 'Data must be a boolean']];
+                        $this->response = ['error' => ['message' => 'Data must be a boolean', 'Key' => $lastKey, 'Data' => $data, 'Patch' => $patch]];
                         return;
                     }
 
-                    $this->variablesTypes[$patch[count($patch) - 2]][$lastKey] = $data;
+                    $this->variablesTypes[$patch[count($patch) - 2]][$lastKey] = $bool;
 
                     return;
                 case 'string':
 
-                    if (!is_string($data)) {
-                        $this->response = ['error' => ['message' => 'Data must be a string']];
+                    try {
+                        if (is_array($data)) {
+                            if (count($data) === 1) {
+                                $data = $data[0];
+
+                            } else {
+                                $this->response = ['error' => ['message' => 'Data array have must one index', 'Key' => $lastKey, 'Data' => $data, 'Patch' => $patch]];
+                            }
+                        }
+                        $data = (string)$data;
+                    } catch (Exception $e) {
+                        $this->response = ['error' => ['message' => 'Data must be a string', 'Key' => $lastKey, 'Data' => $data, 'Patch' => $patch]];
                         return;
                     }
 
-                    $this->variablesTypes[$patch[count($patch) - 2]][$lastKey] = $data;
+                    $this->variablesTypes[$patch[count($patch) - 2]][$lastKey] = (string)$data;
 
                     return;
                 case 'array':
+
+                    if (is_string($data)) {
+                        $data = explode(',', $data);
+                    }
+
                     if (!is_array($data)) {
-                        $this->response = ['error' => ['message' => 'Data must be an array']];
+                        $this->response = ['error' => ['message' => 'Data must be an array', 'Key' => $lastKey, 'Data' => $data, 'Patch' => $patch]];
                         return;
                     }
 
@@ -124,6 +169,11 @@ class DataManipulator
 
                     $object = $dataManipulator->createObject(json_encode($data));
 
+                    if (is_array($object)) {
+                        $this->response = $object;
+                        break;
+                    }
+
                     $this->variablesTypes[$patch[count($patch) - 2]][$lastKey] = $object;
 
                     return;
@@ -135,7 +185,7 @@ class DataManipulator
     {
         $data = $this->filter($data);
 
-        if ($data === null) {
+        if (count($this->response) > 0) {
             return $this->response;
         }
 
