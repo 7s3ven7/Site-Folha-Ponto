@@ -9,30 +9,26 @@ class Server
 
     public function __construct()
     {
+
         $this->method = $_SERVER['REQUEST_METHOD'];
+
     }
 
-    public function getMethod(): string
-    {
-        return $this->method;
-    }
-
-    public function response(int $code, array|string|object $body): void
+    public function response(int $code, array $response): void
     {
 
         http_response_code($code);
 
         Header("Content-type: application/json");
 
-        if (is_array($body)) {
-            $body = json_encode($body);
-        }
-        if (is_object($body)) {
-            print_r($body);
-            return;
-        }
+        print_r(json_encode($response));
 
-        echo $body;
+    }
+
+    public function getMethod(): string
+    {
+
+        return $this->method;
 
     }
 
