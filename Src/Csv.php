@@ -7,7 +7,7 @@ class Csv
 
     private string $filename;
     private array $path = [];
-    private string $fullPath;
+    private string $fullPath = "";
 
 
     public function __construct(string $filename, array $path = [])
@@ -19,20 +19,41 @@ class Csv
 
     }
 
-    public function writeCSV(array $data, bool $read): mixed
+    public function writeCSV(array $data, bool $read): array
     {
 
+        $this->testPath();
+
         if ($read) {
-            $file = $this->readCSV($this->filename);
+            $file = fopen($this->fullPath . $this->filename, 'a');
         } else {
-            $file = $this->createCSV($data);
+            $file = $this->createCSV();
         }
 
-        return $file;
+        if (is_array($file) && isset($file['error'])) {
+            return $file;
+        }
+
+        var_dump($file);
+
+        foreach ($data as $row) {
+            $lineAsWrite = '';
+            foreach ($row as $value) {
+                $lineAsWrite .= $value . ',';
+            }
+            $lineAsWrite = substr($lineAsWrite, 0, -1);
+            $lineAsWrite .= "\n";
+            $error = fwrite($file, $lineAsWrite);
+            if (is_bool($error) && !$error) {
+                return ['success' => false, 'error' => 'Error writing file', 'path' => $this->fullPath, 'line' => $lineAsWrite];
+            }
+        }
+
+        return ['success' => true];
 
     }
 
-    private function testPath(): string
+    private function testPath(): void
     {
 
         $fullPath = '';
@@ -49,32 +70,24 @@ class Csv
         }
         $this->fullPath = $fullPath;
 
-        return $fullPath;
-
     }
 
-    private function createCSV(array $data): mixed
+    private function createCSV(): mixed
     {
 
-        $fullPath = $this->testPath();
-
-        //numero incremental para não tentar criar arquivo existente, e modificar filename caso precise
-        $i = 1;
-        while (file_exists($fullPath . $this->filename . '(' . $i . ').csv')) {
-            $i++;
+        if (is_file($this->fullPath . $this->filename)) {
+            return ['error' => 'File already exists ' . $this->fullPath . $this->filename];
         }
 
-        return fopen($fullPath . $this->filename . '(' . $i . ').csv', 'w+');
+        return fopen($this->fullPath . $this->filename, 'w+');
 
     }
 
-    private function readCSV(): mixed
+    public function GetContentCSV(): mixed
     {
 
-        $fullPath = $this->testPath();
-
-        if (file_exists($fullPath . $this->filename . '.csv')) {
-            return $this->transformCSV(fopen($fullPath . $this->filename . '.csv', 'r'));
+        if (file_exists($this->fullPath . $this->filename)) {
+            return $this->transformCSV(fopen($this->fullPath . $this->filename, 'r'));
         }
 
         return ['error' => 'file not found'];
@@ -90,10 +103,26 @@ class Csv
 
         while (($line = fgetcsv($file)) !== false) {
             $lines[] = $line;
-
         }
 
         return $lines;
+    }
+
+    public function deleteCSV(): array
+    {
+        $this->testPath();
+
+        if (is_file($this->fullPath . $this->filename)) {
+
+            if (!unlink($this->fullPath . $this->filename)) {
+                return ['error' => 'Error deleting file'];
+            }
+
+        } else {
+            return ['error' => 'file not found'];
+        }
+
+        return ['success' => true];
     }
 
 }
