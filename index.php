@@ -43,9 +43,9 @@ $app->group('/Planilha', function (RouteCollectorProxy $group) {
         $excel->writeData($data);
         $excel->saveFile();
 
-        $response->withHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        $response->withHeader('Content-Disposition', 'attachment;filename="' . $fileName . '.xlsx"');
-        $response->withHeader('Cache-Control', 'max-age=0');
+        //$response->withHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        //$response->withHeader('Content-Disposition', 'attachment;filename="' . $fileName . '.xlsx"');
+        //$response->withHeader('Cache-Control', 'max-age=0');
 
         return $response;
     });

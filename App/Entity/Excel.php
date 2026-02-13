@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Service\Manipulator\TransformObject;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
@@ -13,6 +14,7 @@ class Excel
     private string $fileName;
     private string $fullPatch;
     public array $classStyle;
+    public array $positionClassStyle;
     private Spreadsheet $file;
     private Xlsx $saver;
 
@@ -21,6 +23,7 @@ class Excel
         $this->fileName = '';
         $this->fullPatch = '';
         $this->classStyle = [];
+        $this->positionClassStyle = [];
         $this->file = new Spreadsheet();
         $this->file->setActiveSheetIndex(0);
     }
@@ -83,144 +86,127 @@ class Excel
 
         $spreadsheet = $this->file->getActiveSheet();
 
+        if (isset($data->variables) && is_object($data->variables)) {
+            $TransformObject = new TransformObject();
+
+            $classArray = $TransformObject->returnArray($data->variables);
+            $this->StyleSeparator($classArray);
+        }
+
         if (isset($data->cell)) {
-            $this->writewithArray($data, $spreadsheet);
+            $this->writewithArray($data->cell, $spreadsheet);
         }
 
-        var_dump($this->classStyle);
 
-    }
-
-    private function writeWithArray(object $data, Worksheet $spreadsheet): void
-    {
-
-        foreach ($data->cell as $value) {
-
-            if (isset($value->style)) {
-
-                if (!isset($this->classStyle[$value->style])) {
-
-                    if (isset($data->variables->{$value->style})) {
-
-                        $this->filterStyle($data->variables->{$value->style}, $value->style);
-
-                    }
-
-                }
-            }
-
-            $spreadsheet->setCellValue($value->position, $value->value);
-
-        }
-    }
-
-    private function filterStyle(object $cell, string $class): void
-    {
-
-        $map = [
-            'font' => [
-                'name' => '',
-                'size' => '',
-                'bold' => '',
-                'italic' => '',
-                'underline' => '',
-                'color' => ''
-            ],
-            'background' => [
-                'backgroundType' => '',
-                'backgroundColor' => ''
-            ],
-            'alignment' => [
-                'horizontal' => '',
-                'vertical' => '',
-            ],
-            'border' => [
-                'all' => [
-                    'borderStyle' => '',
-                    'color' => ''
-                ]
-            ]
-        ];
-
-        $this->classStyle[$class] = [];
-        $this->verifyStyle($cell, $map, $this->classStyle[$class]);
-
-    }
-
-    private function verifyStyle(object $cell, array $map, array &$path = []): void
-    {
-
-        foreach ($map as $field => $var) {
-
-            if (isset($cell->{$field})) {
-
-                $newPath = $this->filterNameFields($field, $cell, $path);
-
-                if (is_array($var)) {
-
-
-                    if (is_object($cell->{$field})) {
-                        $this->verifyStyle($cell->{$field}, $var, $newPath);
-                    }
-
-                }
-            }
-
+        if ($this->classStyle !== []) {
+            $this->setStyle($spreadsheet);
         }
 
     }
 
-    private function filterNameFields(string|int|bool $fieldCell, object $cell, array &$path): array
+    private function StyleSeparator(array $classes): void
     {
 
-        $map = [
+        $mapArray = [
             'background' => 'fill',
-            'backgroundType' => 'fillType',
-            'backgroundColor' => 'starterColor',];
+            'backgroundVars' => [
+                'backgroundType' => 'fillType',
+                'backgroundColor' => 'startColor',
+                'backgroundColorVars' => [
+                    'rgb' => 'rgb'
+                ]
+            ],
+            'font' => 'font',
+            'fontVars' => [
+                'fontWeight' => 'bold',
+                'fontSize' => 'size',
+                'color' => 'color',
+                'colorVars' => [
+                    'rgb' => 'rgb'
+                ]
+            ],
+            'alignmentText' => 'alignment',
+            'alignmentTextVars' => [
+                'horizontal' => 'horizontal',
+                'vertical' => 'vertical',
+            ],
+            'border' => 'borders',
+            'borderVars' => [
+                'all' => 'allBorders',
+                'allVars' => [
+                    'style' => 'borderStyle',
+                    'color' => 'color',
+                    'colorVars' => [
+                        'rgb' => 'rgb'
+                    ]
+                ],
+                'outLineVars' => [
+                    'outline' => 'outline',
+                ]
+            ],
+            'numberFormat' => 'numberFormat',
+            'numberFormatVars' => [
+                'format' => 'formatCode'
+            ],
+            'outLine' => 'outline'
+        ];
 
-        foreach ($map as $field => $var) {
+        foreach ($classes as $name => $class) {
+            $this->classStyle[$name] = [];
+            $this->filterStyle($this->classStyle[$name], $class, $mapArray);
+        };
 
-            if ($field === $fieldCell) {
-
-                $path[$var] = [];
-                var_dump($path);
-
-                if (is_object($cell->{$var})) {
-                    $this->filterNameFields($field, $cell, $path);
-                }
-
-                $this->filterNameFieldAsConst($var, $cell->{$field}, $path[$var]);
-
-            }
-
-            break;
-        }
-
-        return $path;
     }
 
-    private
-    function filterNameFieldAsConst(string|int|bool $fieldCell, object $cell, array &$path): void
+    private function filterStyle(array &$path, array $class, array $map): void
     {
 
-        $map = ['backgroundType' => 'fillType',
-            [
-                'solid' => Fill::FILL_SOLID,
-            ],
-        ];
-        foreach ($map as $field => $typeValues) {
-            if ($field === $fieldCell) {
-                $path[$typeValues] = [];
-                foreach ($typeValues as $value => $const) {
-                    echo PHP_EOL;
-                    echo PHP_EOL;
-                    if ($cell->{$field} === $value) {
-                        $path[$field] = $const;
+        $mapValues = ['backgroundType' => [
+            'solid' => fill::FILL_SOLID
+        ]];
+
+        foreach ($class as $key => $value) {
+            if (isset($map[$key])) {
+
+                $path[$map[$key]] = [];
+
+                if (is_array($value) && is_array($map[$key . 'Vars'])) {
+                    $this->filterStyle($path[$map[$key]], $value, $map[$key . 'Vars']);
+                }
+
+                if (!is_array($value)) {
+                    if (isset($mapValues[$key])) {
+                        foreach ($mapValues[$key] as $keyValues => $constantValues) {
+                            if ($keyValues === $value) {
+                                $path[$map[$key]] = $constantValues;
+                            }
+                        };
+                    } else {
+                        $path[$map[$key]] = $value;
                     }
                 }
+
             }
+
         }
 
+    }
+
+    private function setStyle(Worksheet $spreadsheet): void
+    {
+        foreach ($this->classStyle as $name => $class) {
+            foreach ($this->positionClassStyle[$name] as $position) {
+                $spreadsheet->applyStylesFromArray($position, $class);
+            }
+        }
+    }
+
+    private function writeWithArray(array $cells, Worksheet $spreadsheet): void
+    {
+        foreach ($cells as $cell) {
+            $spreadsheet->setCellValue($cell->position, $cell->value);
+            $this->positionClassStyle[$cell->style][] = $cell->position;
+        }
     }
 
 
